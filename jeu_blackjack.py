@@ -185,24 +185,3 @@ def partie(deck,main,croupier):
                 print("Égalité.")    
             else:
                 print("Vous avez perdu.")
-
-# --------------------------------------------------------------------------------------------------------------------------------------------------------------#
-# "Main"
-# --------------------------------------------------------------------------------------------------------------------------------------------------------------#
-
-rejouer = True
-
-while(rejouer):
-    deck = melanger_deck(creer_deck())
-    joueur,croupier = [],[]
-    partie(deck,joueur,croupier)
-    i = input("Souhaitez vous rejouer ?\no pour oui,\nn pour non\n")
-    match i:
-        case "o":
-
-            pass
-        case "n":
-            print("Merci d'avoir joué !")
-            rejouer = False
-        case _:
-            print("Choix incorrect.\n")

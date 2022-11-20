@@ -8,8 +8,11 @@ import asyncio
 HOST = "10.0.1.1"
 PORT_DEALER = "668"
 PORT_PLAYER = "667"
-
-tables = []
+tableName = str
+delay = int
+playerName = str
+players = {playerName,tableName}
+tables = {tableName, delay}
 
 async def handle_dealer_request(dealer_reader, dealer_writer):
     pass
@@ -43,7 +46,7 @@ def creer_deck():
     return deck
     
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
-# Mélangation du deck
+# Mélanger le deck
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
 
 def melanger_deck(deck):
@@ -88,7 +91,7 @@ def partie_multi(n):
     compteur_voir = 0
 
     while(compteur_voir == 0):
-        #on attend les choix
+        # on attend les choix
         # on rempli la liste des choix en fonction des reponses des joueurs
 
         for i in range(0,n):

@@ -4,6 +4,8 @@
 from sys import argv
 from socket import gethostbyname
 import asyncio
+import random
+import os
 
 HOST = "10.0.1.1"
 PORT_DEALER = "668"
@@ -15,10 +17,38 @@ players = {playerName,tableName}
 tables = {tableName, delay}
 
 async def handle_dealer_request(dealer_reader, dealer_writer):
-    pass
+   
+    data = await dealer_reader.read(PORT_DEALER) # gets a message ...
+    
+    if data == "NAME": # changer ca en une fonction qui est plus generique
+        dealer_writer.write(f'entrer le nom :\n')
+        tableName = await dealer_reader.read(PORT_DEALER)
+        dealer_writer.write(f'recu\n')
+    
+    elif data == "TIME":
+        dealer_writer.write(f'entrer le temps :\n')
+        delay = await dealer_reader.read(PORT_DEALER)
+        dealer_writer.write(f'recu\n')
+
+    dealer_writer.close()
+    dealer_reader.close()
 
 async def handle_player_request(player_reader, player_writer):
-    pass
+    data = await player_reader.read(PORT_PLAYER) # gets a message ...
+
+    if data == "NAME": # nom d'une table
+        player_writer.write(f'entrer le nom :\n')
+        tableName = await player_reader.read(PORT_PLAYER)
+        player_writer.write(f'recu, vous entrer dans la table {tableName}\n') # ajouter le cas ou le nom de table n'est pas bon
+
+    if data == "p": # demande de pioche
+        player_writer.write(f'Votre nouvelle carte est :\n')
+
+    if data == "p": # demande de voir
+        player_writer.write(f'Vous avez fini de jouer, votre score final est de : ... , en attente des autres joueurs\n')
+
+    player_writer.close()
+    player_reader.close()
 
 async def blackjack_server():
     # démarre le serveur
@@ -28,15 +58,14 @@ async def blackjack_server():
         await server_dealer.serve_forever()
     async with server_player:
         await server_player.serve_forever() 
-import random
-import os
+
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
 # Initialisation du jeu de carte
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
 
 def creer_deck():
-    deck =[]
+    deck = []
     couleurs = ["♦","♥","♠","♣"]
 
     for i in range(0,4):

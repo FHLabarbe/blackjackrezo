@@ -17,21 +17,26 @@ players = {playerName,tableName}
 tables = {tableName, delay}
 
 async def handle_dealer_request(dealer_reader, dealer_writer):
-   
-    data = await dealer_reader.read(PORT_DEALER) # gets a message ...
+
+    haveName = False
+    haveDelay = False
+
+    while(not haveName):
+        data = await dealer_reader.readline()
+        dealer_writer.write(f'Veuillez rentrer le nom de la table que vous voulez créer sous la forme NAME [nom]\n')   
+        if data[0,4] == "NAME":
+            localTableName = data[5::]
+            haveName = True
     
-    if data == "NAME": # changer ca en une fonction qui est plus generique
-        dealer_writer.write(f'entrer le nom :\n')
-        tableName = await dealer_reader.read(PORT_DEALER)
-        dealer_writer.write(f'recu\n')
-    
-    elif data == "TIME":
-        dealer_writer.write(f'entrer le temps :\n')
-        delay = await dealer_reader.read(PORT_DEALER)
-        dealer_writer.write(f'recu\n')
+    while(not haveDelay):
+        if data[0,4] == "TIME":
+            localDelay = data[5::]
+            haveDelay = True
+
+    tables[localTableName].append(localDelay)
 
     dealer_writer.close()
-    dealer_reader.close()
+
 
 async def handle_player_request(player_reader, player_writer):
     data = await player_reader.read(PORT_PLAYER) # gets a message ...

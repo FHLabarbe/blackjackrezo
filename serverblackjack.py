@@ -16,44 +16,49 @@ playerName = str
 players = {playerName,tableName}
 tables = {tableName, delay}
 
-async def handle_dealer_request(dealer_reader, dealer_writer):
-
+async def handle_dealer_request(reader, writer):
+    #Le croupier est en attente du HELLO et ne reçoit pas le message pour le moment
     haveName = False
     haveDelay = False
 
+    writer.write(f'Bienvenue sur le serveur de blackjack.')
+    await writer.drain()
     while(not haveName):
-        data = await dealer_reader.readline()
-        dealer_writer.write(f'Veuillez rentrer le nom de la table que vous voulez créer sous la forme NAME [nom]\n')   
+        data = await reader.readline()
+        writer.write(f'Veuillez rentrer le nom de la table que vous voulez créer sous la forme NAME [nom]\n')   
         if data[0,4] == "NAME":
-            localTableName = data[5::]
+            localTableName = data[5:]
             haveName = True
     
     while(not haveDelay):
         if data[0,4] == "TIME":
-            localDelay = data[5::]
+            localDelay = data[5:]
             haveDelay = True
 
     tables[localTableName].append(localDelay)
 
-    dealer_writer.close()
+    writer.close()
 
 
-async def handle_player_request(player_reader, player_writer):
-    data = await player_reader.read(PORT_PLAYER) # gets a message ...
+async def handle_player_request(reader,writer):
+
+    data = await reader.read() #préciser le nb n de bytes à lire, sinon écrire readline à la place de read 
 
     if data == "NAME": # nom d'une table
-        player_writer.write(f'entrer le nom :\n')
-        tableName = await player_reader.read(PORT_PLAYER)
-        player_writer.write(f'recu, vous entrer dans la table {tableName}\n') # ajouter le cas ou le nom de table n'est pas bon
+        writer.write(f'entrer le nom :\n')
+        tableName = await reader.read()
+        writer.write(f'recu, vous entrer dans la table {tableName}\n') # ajouter le cas ou le nom de table n'est pas bon
+        playerName = writer.get_extra_info('peername'[0])
+        players.append[playerName] = tableName
 
     if data == "p": # demande de pioche
-        player_writer.write(f'Votre nouvelle carte est :\n')
+        writer.write(f'Votre nouvelle carte est :\n')
 
     if data == "p": # demande de voir
-        player_writer.write(f'Vous avez fini de jouer, votre score final est de : ... , en attente des autres joueurs\n')
+        writer.write(f'Vous avez fini de jouer, votre score final est de : ... , en attente des autres joueurs\n')
 
-    player_writer.close()
-    player_reader.close()
+    writer.close()
+    reader.close()
 
 async def blackjack_server():
     # démarre le serveur
@@ -129,12 +134,11 @@ def partie_multi(n):
         # on rempli la liste des choix en fonction des reponses des joueurs
 
         for i in range(0,n):
-            match choix[i]:
-                case "v" :
-                    compteur_voir +=1
-                case "p" :
-                    mains[i+1].append(deck[-1])
-                    deck.pop
+            if choix[i] == "v" :
+                compteur_voir +=1
+            elif choix[i] == "p" :
+                mains[i+1].append(deck[-1])
+                deck.pop
 
         if compteur_voir<n:
             compteur_voir = 0

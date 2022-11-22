@@ -13,30 +13,29 @@ PORT_PLAYER = "667"
 tableName = str
 delay = int
 playerName = str
-players = {playerName,tableName}
-tables = {tableName, delay}
+players = {playerName : tableName}
+tables = {tableName : delay}
 
 async def handle_dealer_request(reader, writer):
-    #Le croupier est en attente du HELLO et ne reçoit pas le message pour le moment
-    haveName = False
-    haveDelay = False
 
-    writer.write(f'Bienvenue sur le serveur de blackjack.')
+    writer.write(f"Bienvenue sur le serveur de blackjack.".encode() + b"\r\n") 
     await writer.drain()
-    while(not haveName):
-        data = await reader.readline()
-        writer.write(f'Veuillez rentrer le nom de la table que vous voulez créer sous la forme NAME [nom]\n')   
-        if data[0,4] == "NAME":
-            localTableName = data[5:]
-            haveName = True
+
+    #Récupération du nom de la table
+    data = await reader.readline()
+    localTableName = data[5:].decode()
+    writer.write(f"Nom de la table reçu.".encode() + b"\r\n")
+    await writer.drain()
     
-    while(not haveDelay):
-        if data[0,4] == "TIME":
-            localDelay = data[5:]
-            haveDelay = True
+    #Récupération du uptime delay de la table
+    data = await reader.readline()
+    localDelay = data[5:].decode()
+    writer.write(f"Délai reçu.".encode() + b"\r\n")
+    await writer.drain()
 
-    tables[localTableName].append(localDelay)
-
+    #insertion de la table dans le dictionnaire. La clé est le nom de la table, et le délai associé : la valeur.
+    tables[localTableName] = localDelay
+    
     writer.close()
 
 
@@ -49,7 +48,7 @@ async def handle_player_request(reader,writer):
         tableName = await reader.read()
         writer.write(f'recu, vous entrer dans la table {tableName}\n') # ajouter le cas ou le nom de table n'est pas bon
         playerName = writer.get_extra_info('peername'[0])
-        players.append[playerName] = tableName
+        players[playerName] = tableName
 
     if data == "p": # demande de pioche
         writer.write(f'Votre nouvelle carte est :\n')

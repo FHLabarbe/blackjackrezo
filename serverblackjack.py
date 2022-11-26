@@ -176,7 +176,7 @@ async def partie_multi(joueurs,nomTable):
 
     mains = [[]] * (n+1) # liste qui garde les mains des joueurs
     joueurs_actifs = [True] * n # sert de "compteur de joueur(s) actif(s)"
-    choix = [] * n # pour sauvegarder les choix de chacun
+    #choix = [] * n # pour sauvegarder les choix de chacun
     scores = [0] * (n+1) # pour sauvegarder les scores des joueurs
 
     deck = melanger_deck(creer_deck()) # on creer le deck et on le melange
@@ -206,7 +206,7 @@ async def partie_multi(joueurs,nomTable):
       
         for i in range(0,n):
             # on calcule le score du joueur pour savoir si il peut jouer ou pas
-            affiche_mains(mains[i+1])
+            affiche_mains(mains[i+1])# ne pas oublier les autres parametres d'appel
             if joueurs_actifs[i]:
 
                 choixJoueur = ask_joueurs(readerPartie[i],writerPartie[i])
@@ -218,7 +218,6 @@ async def partie_multi(joueurs,nomTable):
                     writerPartie.write(f'Vous piochez une carte.'.encode() + b"\r\n")
 
                     if score[i+1]>21: #on regarde tout de suite apres avoir pioché si le score est > 21 comme ca on peux deja virer le joueur
-                        joueurs_actifs[i] = False
                         writerPartie.write(f'Vous avez dépasser 21, vous avez perdu.'.encode() + b"\r\n")
                         affiche_mains(mains[i+1],writerPartie[i],score[i+1])
                         writerPartie.write(f"END".encode())
@@ -231,7 +230,6 @@ async def partie_multi(joueurs,nomTable):
     while(scores[0]<17) : # le croupier fini de jouer si besoin (- de 17)
         mains[i+1].append(deck[-1])
         deck.pop
-        score
         scores[0] = scores(mains[0])
 
     for i in range(0,n):

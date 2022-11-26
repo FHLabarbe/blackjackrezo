@@ -53,13 +53,16 @@ async def handle_player_request(reader,writer):
     tableName = data[5:].decode()
     for table in waitingTables:
         nb = count(tableName)
+        print(nb)
         if tableName == table and (nb < 1): # on vérifie que la table existe et compte le nb de fois qu'un joueur a cette table d'associée
+            print("rire")
             playerName = writer.get_extra_info('peername'[0])
             players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
             writer.write(f'recu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
             await waitDelay(tableName)
             return
-        elif tableName == table and (nb > 1): # gérer l'asynchronicité pour que le joueur ne rejoigne pas si la table est fermée
+        elif tableName == table and (nb >= 1): # gérer l'asynchronicité pour que le joueur ne rejoigne pas si la table est fermée
+            print("rire mais avec qq'1")
             playerName = writer.get_extra_info('peername'[0])
             players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
             print("bonjour")
@@ -133,6 +136,7 @@ def melanger_deck(deck):
 def score(main):
     s = 0
     for i in range(len(main)):
+        print(main[i][0])
         if(main[i][0]>9):
             s+=10
         elif(main[i][0]==1):
@@ -153,9 +157,10 @@ async def ask_joueurs(reader, writer):
     writer.write(message.encode()) # je crois que c'est ce qu'il faut envoyer pour activer la sequence de choix de carte (joueur.py ligne 33)
     #Récupération du choix
     data = await reader.readline()
-    localChoix = data[5] # on prend le 6e caractère ("MORE 1" on prend le "1")
+    dec_data = data.decode()
+    localChoix = dec_data[5] # on prend le 6e caractère ("MORE 1" on prend le "1")
     writer.write(f"Choix enregistré".encode() + b"\r\n")
-    await writer.drain()
+    #await writer.drain()
 
     return localChoix
 
@@ -168,17 +173,18 @@ def isActivePlayers(joueurs):
 
 def affiche_mains(main,writer,score): # cette fonction affiche les cartes et le score de la main donnée en paramètre au joueur dont le writer est en paramètre
     writer.write((f"Vos cartes sont : {main}".encode() + b"\r\n"))
-    #for i in main:
-    #    writer.write((f"{i}".encode() + b"\r\n"))
     writer.write((f"Votre score est de : {score}".encode() + b"\r\n"))
 
 def quiGagne(scoreServeur,scoreJoueur,writer): #fonction qui compare les scores et qui annonce les résultat d'une partie + met fin a la communication (rajouter le fait de pas contacter ceux qui ont deja perdu)
-    if scoreServeur == scoreJoueur:
-        writer.write((f"égalité".encode() + b"\r\n"))
-    elif scoreServeur < scoreJoueur or scoreServeur>21:
-        writer.write((f"vous gagner".encode() + b"\r\n"))
-    else:
+    if (scoreServeur > 21 and scoreJoueur > 21) or ((scoreServeur > scoreJoueur or scoreJoueur>21) and scoreServeur<22):
         writer.write((f"vous perdez".encode() + b"\r\n"))
+
+    elif scoreServeur == scoreJoueur :
+        writer.write((f"égalité".encode() + b"\r\n"))
+
+    elif (scoreServeur < scoreJoueur or scoreServeur>21) and scoreJoueur<22:
+        writer.write((f"vous gagner".encode() + b"\r\n"))
+
     writer.write((f"END".encode() + b"\r\n"))
 
 
@@ -187,6 +193,7 @@ def quiGagne(scoreServeur,scoreJoueur,writer): #fonction qui compare les scores 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
 
 async def partie_multi(joueurs,nomTable):
+
     n = 0 
     readerPartie = []
     writerPartie = []
@@ -205,25 +212,25 @@ async def partie_multi(joueurs,nomTable):
     deck = melanger_deck(creer_deck()) # on creer le deck et on le melange
 
     # le serveur pioche une carte
-    mains[0].append(deck[-1])
+    mains[0] = [deck[-1]]
     deck.pop()
-    scores[0] = score(mains[0])
 
     # on distribue deux cartes par joueur
     for i in range(1,len(mains)):
-        for j in range(1):
+        for j in range(2):
             mains[i].append(deck[-1])
             deck.pop()
 
     # on calcule les scores
-    for i in range(1,n): 
+    for i in range(0,n+1):
         scores[i] = score(mains[i])
+
+    print(scores)
     
     # on va envoyer a chaque joueur la carte du croupier + on affiche la main du joueur en question
     for i in range(0,n):
         writerPartie[i].write((f"La carte du serveur est : {mains[0][0]}".encode() + b"\r\n"))
-        writerPartie[i].drain()
-        affiche_mains(mains[i+1],writerPartie[i],scores[i+1])
+        await writerPartie[i].drain()
 
             
     while(isActivePlayers(joueurs_actifs)):
@@ -234,27 +241,35 @@ async def partie_multi(joueurs,nomTable):
             if joueurs_actifs[i]:
 
                 choixJoueur = await ask_joueurs(readerPartie[i],writerPartie[i])
+                print(str(choixJoueur) + " ouga bouga la saga des singe oui la")
 
                 if choixJoueur == "1": # si c'est 1 on pioche
                     mains[i+1].append(deck[-1])
                     deck.pop()
-                    scores[i+1]+=score(mains[i+1])
-                    writerPartie.write(f'Vous piochez une carte'.encode() + b"\r\n")
+                    scores[i+1]=score(mains[i+1])
+                    nouv_carte = mains[i+1][-1]
+                    writerPartie[i].write(f'Vous piochez la carte : {nouv_carte}'.encode() + b"\r\n")
 
-                    if score[i+1]>21: #on regarde tout de suite apres avoir pioché si le score est > 21 comme ca on peux deja virer le joueur
-                        writerPartie.write(f'Vous avez dépasser 21, vous avez perdu'.encode() + b"\r\n")
-                        affiche_mains(mains[i+1],writerPartie[i],score[i+1])
+                    if scores[i+1]>21: #on regarde tout de suite apres avoir pioché si le score est > 21 comme ca on peux deja virer le joueur
+                        writerPartie[i].write(f'Vous avez dépasser 21, vous avez perdu'.encode() + b"\r\n")
+                        affiche_mains(mains[i+1],writerPartie[i],scores[i+1])
                         joueurs_actifs[i] = False
                 else:
                     joueurs_actifs[i] = False
 
     while(scores[0]<17) : # le croupier fini de jouer si besoin (- de 17)
-        mains[i+1].append(deck[-1])
+        mains[0].append(deck[-1])
         deck.pop()
         scores[0] = score(mains[0])
 
+    writerPartie[i].write((f"La main du serveur est : {mains[0]}".encode() + b"\r\n"))
+    writerPartie[i].write((f"Le score du serveur est : {scores[0]}".encode() + b"\r\n"))
     for i in range(0,n):
+        affiche_mains(mains[i+1],writerPartie[i],scores[i+1])
         quiGagne(scores[0],scores[i+1],writerPartie[i])
+    
+    tables.pop(nomTable)
+
     
 
 if __name__ == '__main__':

@@ -148,7 +148,7 @@ async def ask_joueurs(reader, writer):
 
     return localChoix
 
-def ilyatildesjoueursactifsdanslavion(joueurs):
+def isActivePlayers(joueurs):
     res = False
     for i in joueurs:
         res = res or i
@@ -215,7 +215,7 @@ async def partie_multi(joueurs,nomTable):
         affiche_mains(mains[i+1],writerPartie[i],score[i+1])
 
             
-    while(ilyatildesjoueursactifsdanslavion(joueurs_actifs)):
+    while(isActivePlayers(joueurs_actifs)):
       
         for i in range(0,n):
             # on calcule le score du joueur pour savoir si il peut jouer ou pas
@@ -233,12 +233,9 @@ async def partie_multi(joueurs,nomTable):
                     if score[i+1]>21: #on regarde tout de suite apres avoir pioché si le score est > 21 comme ca on peux deja virer le joueur
                         writerPartie.write(f'Vous avez dépasser 21, vous avez perdu.'.encode() + b"\r\n")
                         affiche_mains(mains[i+1],writerPartie[i],score[i+1])
-                        writerPartie.write(f"END".encode())
                         joueurs_actifs[i] = False
                 else:
                     joueurs_actifs[i] = False
-
-    scores[0] = scores(mains[0])
 
     while(scores[0]<17) : # le croupier fini de jouer si besoin (- de 17)
         mains[i+1].append(deck[-1])

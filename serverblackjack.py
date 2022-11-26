@@ -8,7 +8,7 @@ import random
 from operator import countOf
 import os
 
-HOST = "10.0.1.1"
+HOST = "10.0.0.1"
 PORT_DEALER = "668"
 PORT_PLAYER = "667"
 tableName = str
@@ -46,7 +46,7 @@ async def handle_dealer_request(reader, writer):
 
 async def handle_player_request(reader,writer):
 
-    writer.write(f"Bienvenue sur le serveur de blackjack.".encode() + b"\r\n") 
+    writer.write(f"Bienvenue sur le serveur de blackjack".encode() + b"\r\n") 
     await writer.drain()
 
     data = await reader.readline()
@@ -62,6 +62,7 @@ async def handle_player_request(reader,writer):
         elif tableName == table and (nb > 1): # gérer l'asynchronicité pour que le joueur ne rejoigne pas si la table est fermée
             playerName = writer.get_extra_info('peername'[0])
             players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
+            print("bonjour")
             writer.write(f'recu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
             return
     writer.write("END".encode())
@@ -86,8 +87,19 @@ def count(tableName):
     return count
 
 async def waitDelay(tableName):
-    asyncio.sleep(tables[tableName])
-    waitingTables.pop(tableName)
+    for i in players.keys():
+        if players[i][2] == tableName:
+            players[i][1].write(f'debut du temps d attente'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+    await asyncio.sleep(int(tables[tableName]))
+    for i in players.keys():
+        if players[i][2] == tableName:
+            players[i][1].write(f'fin du temps d attente'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+    ind = -1
+    for i in waitingTables:
+        ind +=1
+        if tableName == i:
+            del waitingTables[ind]
+    
     await partie_multi(players,tableName)
 
 
@@ -137,14 +149,13 @@ def score(main):
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
 
 async def ask_joueurs(reader, writer):
-    writer.write(f'.') # je crois que c'est ce qu'il faut envoyer pour activer la sequence de choix de carte (joueur.py ligne 33)
+    message = ".\n"
+    writer.write(message.encode()) # je crois que c'est ce qu'il faut envoyer pour activer la sequence de choix de carte (joueur.py ligne 33)
     #Récupération du choix
     data = await reader.readline()
-    localChoix = data[6].decode() # on prend le 6e caractère ("MORE 1" on prend le "1")
-    writer.write(f"Choix enregistré.".encode() + b"\r\n")
+    localChoix = data[5] # on prend le 6e caractère ("MORE 1" on prend le "1")
+    writer.write(f"Choix enregistré".encode() + b"\r\n")
     await writer.drain()
-    
-    writer.close()
 
     return localChoix
 
@@ -156,16 +167,15 @@ def isActivePlayers(joueurs):
     return res
 
 def affiche_mains(main,writer,score): # cette fonction affiche les cartes et le score de la main donnée en paramètre au joueur dont le writer est en paramètre
-    writer.write((f"Vos cartes sont :".encode() + b"\r\n"))
-    for i in main:
-        writer.write((f"{i}".encode() + b"\r\n"))
+    writer.write((f"Vos cartes sont : {main}".encode() + b"\r\n"))
+    #for i in main:
+    #    writer.write((f"{i}".encode() + b"\r\n"))
     writer.write((f"Votre score est de : {score}".encode() + b"\r\n"))
-    writer.close()
 
 def quiGagne(scoreServeur,scoreJoueur,writer): #fonction qui compare les scores et qui annonce les résultat d'une partie + met fin a la communication (rajouter le fait de pas contacter ceux qui ont deja perdu)
     if scoreServeur == scoreJoueur:
         writer.write((f"égalité".encode() + b"\r\n"))
-    elif scoreServeur < scoreJoueur:
+    elif scoreServeur < scoreJoueur or scoreServeur>21:
         writer.write((f"vous gagner".encode() + b"\r\n"))
     else:
         writer.write((f"vous perdez".encode() + b"\r\n"))
@@ -196,14 +206,14 @@ async def partie_multi(joueurs,nomTable):
 
     # le serveur pioche une carte
     mains[0].append(deck[-1])
-    deck.pop
+    deck.pop()
     scores[0] = score(mains[0])
 
     # on distribue deux cartes par joueur
     for i in range(1,len(mains)):
-        for j in range(2):
+        for j in range(1):
             mains[i].append(deck[-1])
-            deck.pop
+            deck.pop()
 
     # on calcule les scores
     for i in range(1,n): 
@@ -212,26 +222,27 @@ async def partie_multi(joueurs,nomTable):
     # on va envoyer a chaque joueur la carte du croupier + on affiche la main du joueur en question
     for i in range(0,n):
         writerPartie[i].write((f"La carte du serveur est : {mains[0][0]}".encode() + b"\r\n"))
-        affiche_mains(mains[i+1],writerPartie[i],score[i+1])
+        writerPartie[i].drain()
+        affiche_mains(mains[i+1],writerPartie[i],scores[i+1])
 
             
     while(isActivePlayers(joueurs_actifs)):
       
         for i in range(0,n):
             # on calcule le score du joueur pour savoir si il peut jouer ou pas
-            affiche_mains(mains[i+1])# ne pas oublier les autres parametres d'appel
+            affiche_mains(mains[i+1],writerPartie[i],scores[i+1])# ne pas oublier les autres parametres d'appel
             if joueurs_actifs[i]:
 
-                choixJoueur = ask_joueurs(readerPartie[i],writerPartie[i])
+                choixJoueur = await ask_joueurs(readerPartie[i],writerPartie[i])
 
                 if choixJoueur == "1": # si c'est 1 on pioche
                     mains[i+1].append(deck[-1])
-                    deck.pop
+                    deck.pop()
                     scores[i+1]+=score(mains[i+1])
-                    writerPartie.write(f'Vous piochez une carte.'.encode() + b"\r\n")
+                    writerPartie.write(f'Vous piochez une carte'.encode() + b"\r\n")
 
                     if score[i+1]>21: #on regarde tout de suite apres avoir pioché si le score est > 21 comme ca on peux deja virer le joueur
-                        writerPartie.write(f'Vous avez dépasser 21, vous avez perdu.'.encode() + b"\r\n")
+                        writerPartie.write(f'Vous avez dépasser 21, vous avez perdu'.encode() + b"\r\n")
                         affiche_mains(mains[i+1],writerPartie[i],score[i+1])
                         joueurs_actifs[i] = False
                 else:
@@ -239,8 +250,8 @@ async def partie_multi(joueurs,nomTable):
 
     while(scores[0]<17) : # le croupier fini de jouer si besoin (- de 17)
         mains[i+1].append(deck[-1])
-        deck.pop
-        scores[0] = scores(mains[0])
+        deck.pop()
+        scores[0] = score(mains[0])
 
     for i in range(0,n):
         quiGagne(scores[0],scores[i+1],writerPartie[i])

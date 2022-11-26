@@ -24,19 +24,19 @@ waitingTables = []
 async def handle_dealer_request(reader, writer):
 
     writer.write(f"Bienvenue sur le serveur de blackjack.".encode() + b"\r\n") 
-    await writer.drain()
+    #await writer.drain()
 
     #Récupération du nom de la table
     data = await reader.readline()
     localTableName = data[5:].decode()
     writer.write(f"Nom de la table reçu.".encode() + b"\r\n")
-    await writer.drain()
+    #await writer.drain()
     
     #Récupération du uptime delay de la table
     data = await reader.readline()
     localDelay = data[5:].decode()
     writer.write(f"Délai reçu.".encode() + b"\r\n")
-    await writer.drain()
+    #await writer.drain()
 
     #insertion de la table dans le dictionnaire. La clé est le nom de la table, et le délai associé : la valeur.
     tables[localTableName] = int(localDelay) # ajoute la table et son délai aux tableS
@@ -49,20 +49,24 @@ async def handle_player_request(reader,writer):
     writer.write(f"Bienvenue sur le serveur de blackjack.".encode() + b"\r\n") 
     await writer.drain()
 
-    tableName = await reader.readline() ## Il faut 2 cas, celui où le joueur est le premier arrivé, et celui il y a déjà du monde
+    data = await reader.readline()
+    tableName = data[5:].decode()
     for table in waitingTables:
-        if tableName == table and (countOf(players.values(), tableName) < 1): # on vérifie que la table existe et compte le nb de fois qu'un joueur a cette table d'associée
+        nb = count(tableName)
+        if tableName == table and (nb < 1): # on vérifie que la table existe et compte le nb de fois qu'un joueur a cette table d'associée
             playerName = writer.get_extra_info('peername'[0])
             players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
-            waitDelay(tableName)
-        elif tableName == table and (countOf(players.values(), tableName) > 1): # gérer l'asynchronicité pour que le joueur ne rejoigne pas si la table est fermée
-            playerName = writer.get_extra_info('peername'[0])
-            players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
-        else :
-            writer.write("END".encode())
-            writer.close()
+            writer.write(f'recu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+            await waitDelay(tableName)
             return
-    writer.write(f'recu, vous entrez dans la table {tableName}\n') # ajouter le cas ou le nom de table n'est pas bon
+        elif tableName == table and (nb > 1): # gérer l'asynchronicité pour que le joueur ne rejoigne pas si la table est fermée
+            playerName = writer.get_extra_info('peername'[0])
+            players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
+            writer.write(f'recu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+            return
+    writer.write("END".encode())
+    writer.close()
+    return
 
 async def blackjack_server():
     # démarre le serveur
@@ -74,10 +78,19 @@ async def blackjack_server():
         await server_player.serve_forever() 
 
 
+def count(tableName):
+    count = 0
+    for name in players.keys(): # parcours des différents éléments du dictionnaire
+        if tableName == players[name][2]: #on compare si le nom de la table est égale à la valeur de la 3ème place de la liste de chaque élément.
+            count+=1
+    return count
+
 async def waitDelay(tableName):
     asyncio.sleep(tables[tableName])
-    del waitingTables[tableName]
-    # lancer la partie. appeller la fonction partie
+    waitingTables.pop(tableName)
+    await partie_multi(players,tableName)
+
+
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
 # Initialisation du jeu de carte

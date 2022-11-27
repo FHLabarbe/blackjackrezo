@@ -16,27 +16,23 @@ delay = int
 playerName = str
 playerWriter = asyncio.StreamWriter
 playerReader = asyncio.StreamReader
-#players = {playerName : tableName}
-players = { playerName : [playerReader,playerWriter,tableName]} # le joueur est un nom, un reader, un writer et une table
-tables = {tableName : delay}
+players = {playerName: [playerReader,playerWriter,tableName]}
+tables = {tableName: delay}
 waitingTables = []
 
 async def handle_dealer_request(reader, writer):
 
-    writer.write(f"Bienvenue sur le serveur de blackjack.".encode() + b"\r\n") 
-    #await writer.drain()
+    writer.write(f"Bienvenue sur le serveur de blackjack.".encode() + b"\r\n")
 
     #Récupération du nom de la table
     data = await reader.readline()
     localTableName = data[5:].decode()
     writer.write(f"Nom de la table reçu.".encode() + b"\r\n")
-    #await writer.drain()
     
     #Récupération du uptime delay de la table
     data = await reader.readline()
     localDelay = data[5:].decode()
     writer.write(f"Délai reçu.".encode() + b"\r\n")
-    #await writer.drain()
 
     #insertion de la table dans le dictionnaire. La clé est le nom de la table, et le délai associé : la valeur.
     tables[localTableName] = int(localDelay) # ajoute la table et son délai aux tableS
@@ -51,22 +47,25 @@ async def handle_player_request(reader,writer):
 
     data = await reader.readline()
     tableName = data[5:].decode()
+    print("Tables :")
+    print(tables)
+    print("Waiting tables :")
+    print(waitingTables)
     for table in waitingTables:
         nb = count(tableName)
         print(nb)
         if tableName == table and (nb < 1): # on vérifie que la table existe et compte le nb de fois qu'un joueur a cette table d'associée
-            print("rire")
-            playerName = writer.get_extra_info('peername'[0])
+            print("Cas1, il y a un seul joueur")
+            playerName = writer.get_extra_info('peername')[0]
             players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
-            writer.write(f'recu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+            writer.write(f'reçu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
             await waitDelay(tableName)
             return
         elif tableName == table and (nb >= 1): # gérer l'asynchronicité pour que le joueur ne rejoigne pas si la table est fermée
-            print("rire mais avec qq'1")
-            playerName = writer.get_extra_info('peername'[0])
+            print("Cas2, il y a + d'un joueur")
+            playerName = writer.get_extra_info('peername')[0]
             players[playerName] = [reader,writer,tableName] # ajoute le joueur ainsi que ses readers et writers dans le dictionnaire
-            print("bonjour")
-            writer.write(f'recu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+            writer.write(f'reçu, vous entrez dans la table {tableName}'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
             return
     writer.write("END".encode())
     writer.close()
@@ -90,13 +89,13 @@ def count(tableName):
     return count
 
 async def waitDelay(tableName):
-    for i in players.keys():
-        if players[i][2] == tableName:
-            players[i][1].write(f'debut du temps d attente'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+    for name in players.keys():
+        if players[name][2] == tableName:
+            players[name][1].write(f'Attente de participant'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
     await asyncio.sleep(int(tables[tableName]))
-    for i in players.keys():
-        if players[i][2] == tableName:
-            players[i][1].write(f'fin du temps d attente'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
+    for name in players.keys():
+        if players[name][2] == tableName:
+            players[name][1].write(f'Lancement de la partie'.encode() + b"\r\n") # ajouter le cas ou le nom de table n'est pas bon
     ind = -1
     for i in waitingTables:
         ind +=1
@@ -117,8 +116,14 @@ def creer_deck():
 
     for i in range(0,4):
         for j in range(0,13):
-            num = j%14
-            deck.append([j+1,couleurs[i]])
+            if j==10:
+                deck.append(["V",couleurs[i]])
+            elif j==11:
+                deck.append(["D",couleurs[i]])
+            elif j==12:
+                deck.append(["R",couleurs[i]])
+            else:
+                deck.append([j+1,couleurs[i]])
     return deck
     
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -136,16 +141,16 @@ def melanger_deck(deck):
 def score(main):
     s = 0
     for i in range(len(main)):
-        print(main[i][0])
-        if(main[i][0]>9):
+        valeur = str(main[i][0])
+        if(valeur>"9") or (valeur == "V") or (valeur == "D") or (valeur == "R"):
             s+=10
-        elif(main[i][0]==1):
+        elif(valeur=="1"):
             if(s+11>21):
                 s+=1
             else:
                 s+=11
         else:
-            s += main[i][0]
+            s += int(valeur)
     return s
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -183,7 +188,7 @@ def quiGagne(scoreServeur,scoreJoueur,writer): #fonction qui compare les scores 
         writer.write((f"égalité".encode() + b"\r\n"))
 
     elif (scoreServeur < scoreJoueur or scoreServeur>21) and scoreJoueur<22:
-        writer.write((f"vous gagner".encode() + b"\r\n"))
+        writer.write((f"vous gagnez".encode() + b"\r\n"))
 
     writer.write((f"END".encode() + b"\r\n"))
 
@@ -241,7 +246,6 @@ async def partie_multi(joueurs,nomTable):
             if joueurs_actifs[i]:
 
                 choixJoueur = await ask_joueurs(readerPartie[i],writerPartie[i])
-                print(str(choixJoueur) + " ouga bouga la saga des singe oui la")
 
                 if choixJoueur == "1": # si c'est 1 on pioche
                     mains[i+1].append(deck[-1])
@@ -251,8 +255,8 @@ async def partie_multi(joueurs,nomTable):
                     writerPartie[i].write(f'Vous piochez la carte : {nouv_carte}'.encode() + b"\r\n")
 
                     if scores[i+1]>21: #on regarde tout de suite apres avoir pioché si le score est > 21 comme ca on peux deja virer le joueur
-                        writerPartie[i].write(f'Vous avez dépasser 21, vous avez perdu'.encode() + b"\r\n")
-                        affiche_mains(mains[i+1],writerPartie[i],scores[i+1])
+                        #writerPartie[i].write(f'Vous avez dépasser 21, vous avez perdu'.encode() + b"\r\n")
+                        #affiche_mains(mains[i+1],writerPartie[i],scores[i+1])
                         joueurs_actifs[i] = False
                 else:
                     joueurs_actifs[i] = False
@@ -267,8 +271,17 @@ async def partie_multi(joueurs,nomTable):
     for i in range(0,n):
         affiche_mains(mains[i+1],writerPartie[i],scores[i+1])
         quiGagne(scores[0],scores[i+1],writerPartie[i])
-    
-    tables.pop(nomTable)
+
+    for i in range(len(writerPartie)):
+        writerPartie[i].close() # ferme tous les writers
+    listPlayersToPop = [] # je passe par un dictionnaire pour ne pas changer la taille de ce dernier pendant le parcours
+    for name in players.keys():
+        if nomTable == players[name][2]:
+            listPlayersToPop.append(name)
+    for i in range(len(listPlayersToPop)):
+        players.pop(listPlayersToPop[i]) #on supprime enfin les joueurs qui ont fini la partie
+    tables.pop(nomTable) # supprime la table
+
 
     
 
